@@ -1,7 +1,3 @@
-// acmonitor is a single-page monitor and control panel for the local
-// AzerothCore (Playerbots) server stack: the Dockerized MySQL, the three
-// systemd --user services (ac-authserver, ac-llm-bridge, ac-worldserver),
-// and live game stats pulled from the DB and the worldserver SOAP API.
 package main
 
 import (
@@ -27,10 +23,6 @@ import (
 
 //go:embed web/index.html
 var webFS embed.FS
-
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
 
 type Config struct {
 	Bind         string   `json:"bind"`
@@ -65,10 +57,6 @@ func loadConfig(path string) (*Config, error) {
 	return &c, nil
 }
 
-// ---------------------------------------------------------------------------
-// Shared state
-// ---------------------------------------------------------------------------
-
 var (
 	cfg      *Config
 	db       *sql.DB
@@ -82,10 +70,6 @@ type cpuSample struct {
 	nsec uint64
 	when time.Time
 }
-
-// ---------------------------------------------------------------------------
-// Status types (shape of /api/status JSON)
-// ---------------------------------------------------------------------------
 
 type Status struct {
 	Time     string    `json:"time"`
@@ -143,10 +127,6 @@ type SOAP struct {
 	Error string `json:"error"`
 }
 
-// ---------------------------------------------------------------------------
-// Command helper
-// ---------------------------------------------------------------------------
-
 func runCmd(timeout time.Duration, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -157,10 +137,6 @@ func runCmd(timeout time.Duration, name string, args ...string) (string, error) 
 	err := cmd.Run()
 	return out.String(), err
 }
-
-// ---------------------------------------------------------------------------
-// Collectors
-// ---------------------------------------------------------------------------
 
 func collectStatus() Status {
 	s := Status{Time: time.Now().Format(time.RFC3339)}
@@ -210,7 +186,6 @@ func countCores() int {
 	return n
 }
 
-// memInfo returns total and available memory in bytes from /proc/meminfo.
 func memInfo() (total, avail uint64) {
 	b, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
@@ -391,10 +366,6 @@ func collectGame() Game {
 	return g
 }
 
-// ---------------------------------------------------------------------------
-// SOAP (worldserver console over HTTP)
-// ---------------------------------------------------------------------------
-
 func collectSOAP() SOAP {
 	s := SOAP{}
 	if cfg.SOAP.User == "" || cfg.SOAP.Pass == "" {
@@ -474,10 +445,6 @@ func xmlUnescape(s string) string {
 	return r.Replace(s)
 }
 
-// ---------------------------------------------------------------------------
-// Control
-// ---------------------------------------------------------------------------
-
 type controlReq struct {
 	Action string `json:"action"` // start | stop | restart
 	Target string `json:"target"` // all | <unit name>
@@ -527,10 +494,6 @@ func validUnit(u string) bool {
 	}
 	return false
 }
-
-// ---------------------------------------------------------------------------
-// HTTP
-// ---------------------------------------------------------------------------
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
