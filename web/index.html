@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BurkeyCraft Monitor</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171c22; --panel2:#1e252d; --line:#2a333d;
+    --fg:#e6edf3; --muted:#8b98a5; --accent:#e0a336;
+    --ok:#3fb950; --warn:#d29922; --bad:#f85149; --unknown:#6e7681;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent)}
+  header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:16px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{font-size:18px;margin:0;font-weight:600;letter-spacing:.3px}
+  header h1 .sw{color:var(--accent)}
+  .meta{color:var(--muted);font-size:12px}
+  .grow{flex:1}
+  .wrap{padding:22px;max-width:1200px;margin:0 auto}
+  .row{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .card h2{margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:middle;background:var(--unknown)}
+  .dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .dot.bad{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+  .dot.warn{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+  .svc-name{font-weight:600;font-size:15px}
+  .svc-state{color:var(--muted);font-size:12px;margin-left:auto}
+  .svc-head{display:flex;align-items:center;margin-bottom:10px}
+  .kv{display:flex;justify-content:space-between;padding:3px 0;font-size:13px}
+  .kv .k{color:var(--muted)}
+  .kv .v{font-variant-numeric:tabular-nums}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0}
+  .stat .big{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stat .lbl{color:var(--muted);font-size:12px}
+  .btn{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:7px;
+    padding:7px 13px;font-size:13px;cursor:pointer;transition:.12s}
+  .btn:hover{border-color:var(--accent)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.start{border-color:#2c6e3a}.btn.start:hover{background:#183a22}
+  .btn.stop{border-color:#7d2a26}.btn.stop:hover{background:#3a1614}
+  .btn.restart{border-color:#7a5b1e}.btn.restart:hover{background:#3a2c10}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap}
+  .svc-btns{display:flex;gap:6px;margin-top:12px}
+  .svc-btns .btn{padding:4px 9px;font-size:12px}
+  .bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:6px}
+  .bar>i{display:block;height:100%;background:var(--accent)}
+  pre{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px;
+    overflow:auto;font-size:12px;margin:0;white-space:pre-wrap;max-height:260px}
+  #log{position:fixed;right:16px;bottom:16px;max-width:440px;width:calc(100% - 32px)}
+  .toast{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:8px;padding:10px 12px;margin-top:8px;font-size:12px;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+  .toast.bad{border-left-color:var(--bad)} .toast.ok{border-left-color:var(--ok)}
+  .toast pre{margin-top:6px;max-height:160px}
+  label.tgl{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer}
+  .muted{color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="sw">⚔</span> BurkeyCraft <span class="muted">Monitor</span></h1>
+  <div class="grow"></div>
+  <label class="tgl"><input type="checkbox" id="auto" checked> auto-refresh 5s</label>
+  <span class="meta" id="updated">—</span>
+  <button class="btn" id="refresh">Refresh</button>
+</header>
+
+<div class="wrap">
+  <div class="card" style="margin-bottom:16px">
+    <h2>Stack control</h2>
+    <div class="btnrow">
+      <button class="btn start"   onclick="control('start','all')">▶ Start all</button>
+      <button class="btn restart" onclick="control('restart','all')">↻ Restart all</button>
+      <button class="btn stop"    onclick="control('stop','all')">■ Stop all</button>
+      <span class="meta" style="align-self:center;margin-left:8px">runs <code>server.sh</code> — DB + all services, correct ordering</span>
+    </div>
+  </div>
+
+  <div class="row" id="services"></div>
+
+  <div class="row">
+    <div class="card" id="game-card">
+      <h2>Game — Playerbots</h2>
+      <div id="game"></div>
+    </div>
+    <div class="card">
+      <h2>Database (MySQL / Docker)</h2>
+      <div id="db"></div>
+    </div>
+    <div class="card">
+      <h2>Host</h2>
+      <div id="host"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Worldserver — <code>server info</code> (SOAP)</h2>
+    <pre id="soap">—</pre>
+  </div>
+</div>
+
+<div id="log"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let busy = false;
+
+function fmtBytes(n){
+  if(!n) return "0 B";
+  const u=["B","KB","MB","GB","TB"]; let i=0; n=Number(n);
+  while(n>=1024&&i<u.length-1){n/=1024;i++;}
+  return n.toFixed(i?1:0)+" "+u[i];
+}
+function fmtDur(s){
+  s=Math.max(0,Math.floor(s));
+  const d=Math.floor(s/86400); s%=86400;
+  const h=Math.floor(s/3600); s%=3600;
+  const m=Math.floor(s/60);
+  if(d) return `${d}d ${h}h ${m}m`;
+  if(h) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+function dot(cls){return `<span class="dot ${cls}"></span>`;}
+
+function renderServices(svcs){
+  const el=$("#services"); el.innerHTML="";
+  const nice={"ac-authserver":"Auth server","ac-llm-bridge":"LLM bridge","ac-worldserver":"World server"};
+  for(const s of svcs){
+    const cls = s.up ? "ok" : (s.active==="activating"||s.active==="deactivating") ? "warn" : "bad";
+    const card=document.createElement("div"); card.className="card";
+    card.innerHTML=`
+      <div class="svc-head">${dot(cls)}<span class="svc-name">${nice[s.unit]||s.unit}</span>
+        <span class="svc-state">${s.active}/${s.sub}</span></div>
+      <div class="kv"><span class="k">Uptime</span><span class="v">${s.up?fmtDur(s.uptimeSec):"—"}</span></div>
+      <div class="kv"><span class="k">Memory</span><span class="v">${fmtBytes(s.memBytes)}</span></div>
+      <div class="kv"><span class="k">CPU</span><span class="v">${s.cpuPct.toFixed(1)}%</span></div>
+      <div class="kv"><span class="k">PID</span><span class="v">${s.pid||"—"}</span></div>
+      <div class="svc-btns">
+        <button class="btn start"   onclick="control('start','${s.unit}')">Start</button>
+        <button class="btn restart" onclick="control('restart','${s.unit}')">Restart</button>
+        <button class="btn stop"    onclick="control('stop','${s.unit}')">Stop</button>
+      </div>`;
+    el.appendChild(card);
+  }
+}
+
+function renderGame(g){
+  const el=$("#game");
+  if(!g.ok){ el.innerHTML=`<div class="muted">${g.error||"unavailable"}</div>`; return; }
+  el.innerHTML=`
+    <div class="stat"><span class="lbl">Online total</span><span class="big">${g.online}</span></div>
+    <div class="kv"><span class="k">Real players</span><span class="v">${g.players}</span></div>
+    <div class="kv"><span class="k">Bots</span><span class="v">${g.bots}</span></div>
+    <div class="kv"><span class="k">Accounts</span><span class="v">${g.accounts}</span></div>
+    <div class="kv"><span class="k">Characters</span><span class="v">${g.characters}</span></div>`;
+}
+
+function renderDB(d){
+  const cls = d.up&&d.pingOk ? "ok" : d.up ? "warn" : "bad";
+  const health = d.health&&d.health!=="none" ? d.health : "—";
+  $("#db").innerHTML=`
+    <div class="svc-head">${dot(cls)}<span class="svc-name" style="font-size:14px">${d.container}</span>
+      <span class="svc-state">${d.state}</span></div>
+    <div class="kv"><span class="k">Health</span><span class="v">${health}</span></div>
+    <div class="kv"><span class="k">SQL ping</span><span class="v">${d.pingOk?d.pingMs.toFixed(1)+" ms":"fail"}</span></div>
+    ${d.error?`<div class="muted" style="margin-top:6px;font-size:12px">${d.error}</div>`:""}`;
+}
+
+function renderHost(h){
+  $("#host").innerHTML=`
+    <div class="kv"><span class="k">Load (1/5/15m)</span><span class="v">${h.load1.toFixed(2)} ${h.load5.toFixed(2)} ${h.load15.toFixed(2)}</span></div>
+    <div class="kv"><span class="k">Cores</span><span class="v">${h.cores}</span></div>
+    <div class="kv"><span class="k">Memory</span><span class="v">${fmtBytes(h.memUsed)} / ${fmtBytes(h.memTotal)}</span></div>
+    <div class="bar"><i style="width:${h.memPct.toFixed(0)}%"></i></div>`;
+}
+
+async function refresh(){
+  try{
+    const r=await fetch("/api/status",{cache:"no-store"});
+    const s=await r.json();
+    renderServices(s.services);
+    renderGame(s.game);
+    renderDB(s.db);
+    renderHost(s.host);
+    $("#soap").textContent = s.soap.ok ? s.soap.info : ("SOAP unavailable: "+(s.soap.error||"unknown"));
+    $("#updated").textContent = "updated "+new Date().toLocaleTimeString();
+  }catch(e){
+    $("#updated").textContent = "fetch error: "+e;
+  }
+}
+
+function toast(msg,cls,detail){
+  const t=document.createElement("div"); t.className="toast "+(cls||"");
+  t.innerHTML=`<b>${msg}</b>`+(detail?`<pre>${detail.replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))}</pre>`:"");
+  $("#log").appendChild(t);
+  setTimeout(()=>t.remove(), cls==="bad"?15000:8000);
+}
+
+async function control(action,target){
+  if(busy) return;
+  const label = target==="all"?"the entire stack":target;
+  if(!confirm(`${action.toUpperCase()} ${label}?`)) return;
+  busy=true;
+  document.querySelectorAll(".btn").forEach(b=>b.disabled=true);
+  toast(`${action} ${label}…`,"");
+  try{
+    const r=await fetch("/api/control",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action,target})});
+    const j=await r.json();
+    toast(`${action} ${label}: ${j.ok?"ok":"FAILED"}`, j.ok?"ok":"bad", j.output||j.error);
+  }catch(e){
+    toast(`${action} ${label} error`,"bad",String(e));
+  }finally{
+    busy=false;
+    document.querySelectorAll(".btn").forEach(b=>b.disabled=false);
+    refresh();
+  }
+}
+
+let timer=null;
+function loop(){ if($("#auto").checked) refresh(); }
+$("#auto").addEventListener("change",()=>{ if($("#auto").checked) refresh(); });
+$("#refresh").addEventListener("click",refresh);
+timer=setInterval(loop,5000);
+refresh();
+</script>
+</body>
+</html>

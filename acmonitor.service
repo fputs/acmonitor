@@ -1,0 +1,13 @@
+[Unit]
+Description=BurkeyCraft AzerothCore monitor/control panel
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/evan/src/acmonitor
+ExecStart=/home/evan/src/acmonitor/acmonitor
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

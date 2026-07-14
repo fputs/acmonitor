@@ -1,0 +1,17 @@
+{
+  "bind": "127.0.0.1:8080",
+  "server_script": "/path/to/server.sh",
+  "services": ["ac-authserver", "ac-llm-bridge", "ac-worldserver"],
+  "db_container": "ac-database",
+  "db": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "acore",
+    "pass": "CHANGE_ME"
+  },
+  "soap": {
+    "url": "http://127.0.0.1:7878/",
+    "user": "YOUR_GM_ACCOUNT",
+    "pass": "CHANGE_ME"
+  }
+}

@@ -1,0 +1,9 @@
+# Compiled binary
+/acmonitor
+
+# Local config with live credentials
+/config.json
+
+# Editor / OS cruft
+*.swp
+.DS_Store
